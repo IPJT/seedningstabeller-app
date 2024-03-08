@@ -7,5 +7,9 @@ export async function GET() {
   );
   const data = await result.json();
 
-  return Response.json({ datetime: data.datetime, hej: "Hej på dig" });
+  return Response.json({ datetime: data.datetime, hej: "Hej på dig1" });
 }
+
+const eventNamesVasaloppet = {
+  2020: "VL_999999167888680000000764",
+};
