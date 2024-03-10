@@ -1,25 +1,34 @@
-// run with npx tsx src/app/scripts/generateStartlistStats.ts
+// run with pnpm tsx src/app/scripts/generateStartlistStats.ts
 
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
+import { start } from "repl";
+import { getYearList } from "./utils";
 
-type AllStartListStats = {
-  [year: number]: StartListWithStartGroupStats | StartList;
+type StartLists = {
+  [year: number]: StartList;
 };
 
 type StartList = {
-  total: number;
-  women?: number;
-  men?: number;
+  total: {
+    total: number;
+    women?: number;
+    men?: number;
+  };
+  perStartGroup?: StartListWithStartGroupStats;
 };
 
 type StartListWithStartGroupStats = {
-  [k in keyof typeof START_GROUPS]: StartList;
+  [k in keyof typeof START_GROUPS]?: {
+    total: number;
+    women?: number;
+    men?: number;
+  };
 };
 
 const START_GROUPS = {
   Elit: "Elit",
-  StartGroup2: "2",
   StartGroup1: "1",
+  StartGroup2: "2",
   StartGroup3: "3",
   StartGroup4: "4",
   StartGroup5: "5",
@@ -29,7 +38,7 @@ const START_GROUPS = {
   StartGroup9: "9",
   StartGroup10: "10",
   All: "%",
-} as const;
+};
 
 const SEX = {
   Women: "W",
@@ -40,30 +49,100 @@ const SEX = {
 main();
 
 async function main() {
-  //const yearArray = getYearList(1922, 2024);
+  const yearArray = getYearList(1922, 2024);
+  const startLists: StartLists = {};
 
-  const startList2022 = await getStartListForYear(2022);
+  for (const year of yearArray) {
+    const startList = await getStartListForYear(year);
+
+    if (startList) {
+      startLists[year] = startList;
+    }
+  }
+
+  writeFileSync(
+    "src/app/scripts/startLists.json",
+    JSON.stringify(startLists, null, 2),
+    "utf8"
+  );
 }
 
-async function getStartListForYear(
-  year: number
-): Promise<StartListWithStartGroupStats | StartList> {
+async function getStartListForYear(year: number): Promise<StartList | null> {
   const vasaloppetId = JSON.parse(
     readFileSync("src/app/scripts/vasaloppetIds.json", "utf8")
-  )[year]["Vasaloppet"];
+  )[year]["Vasaloppet"] as string;
+
+  if (!vasaloppetId) {
+    return null;
+  }
 
   const startGroups = Object.keys(START_GROUPS) as Array<
     keyof typeof START_GROUPS
   >;
 
-  startGroups.forEach(async (startGroupKey) => {
-    const numberOfWomenParticipants = await getNumberOfParticipants({
+  const startList: StartList = { total: { total: 0 } };
+
+  for (const startGroupKey of startGroups) {
+    const StartGroupValue = START_GROUPS[startGroupKey];
+
+    const numberOfFemaleParticipants = await getNumberOfParticipants({
       sex: SEX.Women,
       year,
-      startGroup: START_GROUPS.All,
+      startGroup: StartGroupValue,
       vasaloppetId,
     });
+
+    const numberOfMaleParticipants = await getNumberOfParticipants({
+      sex: SEX.Men,
+      year,
+      startGroup: StartGroupValue,
+      vasaloppetId,
+    });
+
+    if (
+      StartGroupValue === START_GROUPS.Elit &&
+      numberOfFemaleParticipants === 0 &&
+      numberOfMaleParticipants === 0
+    ) {
+      break;
+    }
+
+    if (startList.perStartGroup === undefined) {
+      startList.perStartGroup = {};
+    }
+
+    startList.perStartGroup[startGroupKey] = {
+      total: numberOfFemaleParticipants + numberOfMaleParticipants,
+      women: numberOfFemaleParticipants,
+      men: numberOfMaleParticipants,
+    };
+  }
+
+  const totalNumberOfFemaleParticipants = await getNumberOfParticipants({
+    sex: SEX.Women,
+    year,
+    startGroup: START_GROUPS.All,
+    vasaloppetId,
   });
+
+  const totalNumberOfMaleParticipants = await getNumberOfParticipants({
+    sex: SEX.Men,
+    year,
+    startGroup: START_GROUPS.All,
+    vasaloppetId,
+  });
+
+  startList.total = {
+    total: totalNumberOfFemaleParticipants + totalNumberOfMaleParticipants,
+    women: totalNumberOfFemaleParticipants,
+    men: totalNumberOfMaleParticipants,
+  };
+
+  if (startList.total.total > 17000) {
+    console.log(`Year ${year} has more than 17000 participants`);
+  }
+
+  return startList;
 }
 
 async function getNumberOfParticipants({
@@ -95,8 +174,16 @@ async function getNumberOfParticipants({
 
   const result = await response.text();
 
-  console.log(result);
-  return 0;
+  let regex = /(\d+)\s+Results\s+\|\s+Unofficial\s+Results/;
+  let match = result.match(regex);
+
+  let number = 0;
+
+  if (match) {
+    number = parseInt(match[1], 10); // match[1] because match[0] is the full match, and match[1] is the first capturing group
+  }
+
+  return number;
 }
 
 function getFormData({

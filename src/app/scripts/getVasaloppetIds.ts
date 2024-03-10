@@ -1,7 +1,7 @@
 import { writeFileSync } from "fs";
 import { getEncodedSearchParamsUrl, getYearList } from "./utils";
 
-//run with "npx tsx src/app/scripts/getVasaloppetIds.ts"
+//run with "pnpm tsx src/app/scripts/getVasaloppetIds.ts"
 main();
 
 async function main() {
