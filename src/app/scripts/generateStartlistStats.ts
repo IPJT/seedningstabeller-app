@@ -1,7 +1,6 @@
 // run with pnpm tsx src/app/scripts/generateStartlistStats.ts
 
 import { readFileSync, writeFileSync } from "fs";
-import { start } from "repl";
 import { getYearList } from "./utils";
 
 type StartLists = {
