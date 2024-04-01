@@ -2,13 +2,13 @@
 
 import { START_GROUPS } from "@/lib/constants";
 import { StartLists } from "@/scripts/generateStartlistStats";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bar, BarChart, Legend, Tooltip, XAxis, YAxis } from "recharts";
 
 export const StartListChart = ({ startLists }: { startLists: StartLists }) => {
   const [startList, setStartList] = useState<StartLists[number]>();
   const years = Object.keys(startLists);
-  const [year, setYear] = useState<number>(parseInt(years[0], 10));
+  const [year, setYear] = useState<number>(Number(years[0]));
 
   let data = startList ? formatStartList(startList) : [];
 
@@ -29,9 +29,13 @@ export const StartListChart = ({ startLists }: { startLists: StartLists }) => {
         value={year}
         onChange={(e) => {
           const value = e.target.value;
-          const valueAsNumber = parseInt(value, 10);
-          setYear(valueAsNumber);
-          setStartList(startLists[valueAsNumber]);
+          if (startLists[Number(value)]) {
+            setYear(Number(value));
+            setStartList(startLists[Number(value)]);
+          } else {
+            setYear(Number(value) + 1);
+            setStartList(startLists[Number(value) + 1]);
+          }
         }}
         style={{ width: "100%" }}
       ></input>
